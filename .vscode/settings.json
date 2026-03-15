@@ -1,0 +1,8 @@
+{
+    "chat.tools.terminal.autoApprove": {
+        "/^php -l compound-interest\\.php$/": {
+            "approve": true,
+            "matchCommandLine": true
+        }
+    }
+}

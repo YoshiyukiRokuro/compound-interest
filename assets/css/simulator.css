@@ -1,0 +1,116 @@
+.ci-nisa {
+  --ci-bg: #f6f9f8;
+  --ci-card: #ffffff;
+  --ci-border: #dbe5e3;
+  --ci-primary: #0f766e;
+  --ci-accent: #f59e0b;
+  --ci-text: #17312d;
+  --ci-subtle: #55716c;
+
+  background: radial-gradient(circle at 90% 10%, #d0f2ec 0%, rgba(208, 242, 236, 0) 40%),
+    linear-gradient(135deg, #ecf7f3 0%, #f7f9f6 100%);
+  border: 1px solid var(--ci-border);
+  border-radius: 20px;
+  padding: 1.5rem;
+  color: var(--ci-text);
+  box-shadow: 0 12px 28px rgba(15, 118, 110, 0.08);
+}
+
+.ci-nisa__title {
+  margin: 0 0 1rem;
+  font-size: 1.3rem;
+  letter-spacing: 0.01em;
+}
+
+.ci-nisa__panel {
+  background: var(--ci-card);
+  border: 1px solid var(--ci-border);
+  border-radius: 16px;
+  padding: 1rem;
+}
+
+.ci-nisa__grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.ci-nisa__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.92rem;
+  color: var(--ci-subtle);
+}
+
+.ci-nisa__field input {
+  border: 1px solid var(--ci-border);
+  border-radius: 10px;
+  padding: 0.62rem 0.7rem;
+  color: var(--ci-text);
+  background: #fff;
+  font-size: 0.98rem;
+}
+
+.ci-nisa__field input:focus {
+  outline: 2px solid rgba(15, 118, 110, 0.24);
+  border-color: var(--ci-primary);
+}
+
+.ci-nisa__button {
+  margin-top: 1rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(90deg, var(--ci-primary), #169b90);
+  color: #fff;
+  font-weight: 700;
+  padding: 0.65rem 1.3rem;
+  cursor: pointer;
+}
+
+.ci-nisa__summary {
+  margin-top: 1rem;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.ci-nisa__card {
+  background: var(--ci-card);
+  border: 1px solid var(--ci-border);
+  border-radius: 14px;
+  padding: 0.8rem;
+}
+
+.ci-nisa__card span {
+  display: block;
+  color: var(--ci-subtle);
+  font-size: 0.85rem;
+}
+
+.ci-nisa__card strong {
+  display: block;
+  margin-top: 0.22rem;
+  font-size: 1.1rem;
+  line-height: 1.25;
+}
+
+.ci-nisa__chart {
+  margin-top: 1rem;
+  background: #fff;
+  border-radius: 16px;
+  border: 1px solid var(--ci-border);
+  padding: 0.25rem;
+}
+
+@media (max-width: 768px) {
+  .ci-nisa {
+    padding: 1rem;
+    border-radius: 14px;
+  }
+
+  .ci-nisa__grid,
+  .ci-nisa__summary {
+    grid-template-columns: 1fr;
+  }
+}
