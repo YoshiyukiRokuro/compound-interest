@@ -17,10 +17,110 @@ if (!defined('ABSPATH')) {
 
 final class CI_NISA_Simulator {
     const VERSION = '1.0.0';
+    const OPTION_KEY = 'ci_nisa_default_settings';
 
     public function __construct() {
         add_action('wp_enqueue_scripts', array($this, 'register_assets'));
+        add_action('admin_init', array($this, 'register_settings'));
+        add_action('admin_menu', array($this, 'register_admin_menu'));
         add_shortcode('nisa_simulator', array($this, 'render_shortcode'));
+    }
+
+    private function get_base_defaults() {
+        return array(
+            'years' => 20,
+            'annual_rate' => 5,
+            'monthly_contribution' => 30000,
+            'initial_amount' => 0,
+        );
+    }
+
+    private function sanitize_settings($input) {
+        $defaults = $this->get_base_defaults();
+
+        $sanitized = array();
+        $sanitized['years'] = isset($input['years']) ? max(1, min(60, absint($input['years']))) : $defaults['years'];
+        $sanitized['annual_rate'] = isset($input['annual_rate']) && is_numeric($input['annual_rate']) ? (float) $input['annual_rate'] : $defaults['annual_rate'];
+        $sanitized['annual_rate'] = max(0, min(30, $sanitized['annual_rate']));
+        $sanitized['monthly_contribution'] = isset($input['monthly_contribution']) && is_numeric($input['monthly_contribution']) ? (float) $input['monthly_contribution'] : $defaults['monthly_contribution'];
+        $sanitized['monthly_contribution'] = max(0, $sanitized['monthly_contribution']);
+        $sanitized['initial_amount'] = isset($input['initial_amount']) && is_numeric($input['initial_amount']) ? (float) $input['initial_amount'] : $defaults['initial_amount'];
+        $sanitized['initial_amount'] = max(0, $sanitized['initial_amount']);
+
+        return $sanitized;
+    }
+
+    private function get_settings() {
+        $saved = get_option(self::OPTION_KEY, array());
+        $saved = is_array($saved) ? $saved : array();
+
+        return array_merge($this->get_base_defaults(), $this->sanitize_settings($saved));
+    }
+
+    public function register_settings() {
+        register_setting(
+            'ci_nisa_settings_group',
+            self::OPTION_KEY,
+            array($this, 'sanitize_settings')
+        );
+    }
+
+    public function register_admin_menu() {
+        add_options_page(
+            __('NISA Simulator', 'compound-interest'),
+            __('NISA Simulator', 'compound-interest'),
+            'manage_options',
+            'ci-nisa-simulator',
+            array($this, 'render_settings_page')
+        );
+    }
+
+    public function render_settings_page() {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        $settings = $this->get_settings();
+        ?>
+        <div class="wrap">
+            <h1><?php esc_html_e('NISA Simulator Settings', 'compound-interest'); ?></h1>
+            <p><?php esc_html_e('ショートコードに指定がない場合の初期値を設定できます。', 'compound-interest'); ?></p>
+
+            <form method="post" action="options.php">
+                <?php settings_fields('ci_nisa_settings_group'); ?>
+                <table class="form-table" role="presentation">
+                    <tbody>
+                        <tr>
+                            <th scope="row"><label for="ci_nisa_years"><?php esc_html_e('Default Years', 'compound-interest'); ?></label></th>
+                            <td>
+                                <input id="ci_nisa_years" name="<?php echo esc_attr(self::OPTION_KEY); ?>[years]" type="number" min="1" max="60" step="1" value="<?php echo esc_attr($settings['years']); ?>" class="small-text">
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="ci_nisa_annual_rate"><?php esc_html_e('Default Annual Return (%)', 'compound-interest'); ?></label></th>
+                            <td>
+                                <input id="ci_nisa_annual_rate" name="<?php echo esc_attr(self::OPTION_KEY); ?>[annual_rate]" type="number" min="0" max="30" step="0.1" value="<?php echo esc_attr($settings['annual_rate']); ?>" class="small-text">
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="ci_nisa_monthly_contribution"><?php esc_html_e('Default Monthly Contribution (JPY)', 'compound-interest'); ?></label></th>
+                            <td>
+                                <input id="ci_nisa_monthly_contribution" name="<?php echo esc_attr(self::OPTION_KEY); ?>[monthly_contribution]" type="number" min="0" step="1000" value="<?php echo esc_attr($settings['monthly_contribution']); ?>" class="regular-text">
+                            </td>
+                        </tr>
+                        <tr>
+                            <th scope="row"><label for="ci_nisa_initial_amount"><?php esc_html_e('Default Current Asset (JPY)', 'compound-interest'); ?></label></th>
+                            <td>
+                                <input id="ci_nisa_initial_amount" name="<?php echo esc_attr(self::OPTION_KEY); ?>[initial_amount]" type="number" min="0" step="10000" value="<?php echo esc_attr($settings['initial_amount']); ?>" class="regular-text">
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+
+                <?php submit_button(__('Save Settings', 'compound-interest')); ?>
+            </form>
+        </div>
+        <?php
     }
 
     public function register_assets() {
@@ -60,12 +160,7 @@ final class CI_NISA_Simulator {
     }
 
     public function render_shortcode($atts = array()) {
-        $defaults = array(
-            'years' => 20,
-            'annual_rate' => 5,
-            'monthly_contribution' => 30000,
-            'initial_amount' => 0,
-        );
+        $defaults = $this->get_settings();
 
         $atts = shortcode_atts($defaults, $atts, 'nisa_simulator');
 
