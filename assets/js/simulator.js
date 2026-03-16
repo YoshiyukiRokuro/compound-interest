@@ -16,14 +16,15 @@
     return (currencySymbol || '¥') + formatted;
   }
 
-  function calculateSeries(years, annualRate, monthlyContribution, initialAmount) {
-    var monthRate = Math.pow(1 + annualRate / 100, 1 / 12) - 1;
+  function calculateSeries(years, annualRate, trustFee, monthlyContribution, initialAmount) {
+    var effectiveAnnualRate = annualRate - trustFee;
+    var monthRate = Math.pow(1 + effectiveAnnualRate / 100, 1 / 12) - 1;
     var months = years * 12;
 
     var balance = initialAmount;
     var invested = initialAmount;
 
-    var labels = ['Start'];
+    var labels = ['開始時点'];
     var assetData = [Math.round(balance)];
     var investedData = [Math.round(invested)];
 
@@ -32,7 +33,7 @@
       invested += monthlyContribution;
 
       if (m % 12 === 0) {
-        labels.push('Year ' + m / 12);
+        labels.push((m / 12) + '年目');
         assetData.push(Math.round(balance));
         investedData.push(Math.round(invested));
       }
@@ -42,6 +43,7 @@
       labels: labels,
       assetData: assetData,
       investedData: investedData,
+      effectiveAnnualRate: effectiveAnnualRate,
       finalAsset: balance,
       totalInvested: invested,
       totalProfit: balance - invested,
@@ -55,13 +57,16 @@
     var currencySymbol = (window.ciNisaConfig && window.ciNisaConfig.currencySymbol) || '¥';
 
     var inputs = {
+      fundPreset: container.querySelector('select[name="fundPreset"]'),
       years: container.querySelector('input[name="years"]'),
       annualRate: container.querySelector('input[name="annualRate"]'),
+      trustFee: container.querySelector('input[name="trustFee"]'),
       monthlyContribution: container.querySelector('input[name="monthlyContribution"]'),
       initialAmount: container.querySelector('input[name="initialAmount"]'),
     };
 
     var summary = {
+      netAnnualRate: container.querySelector('[data-summary="netAnnualRate"]'),
       finalAsset: container.querySelector('[data-summary="finalAsset"]'),
       totalInvested: container.querySelector('[data-summary="totalInvested"]'),
       totalProfit: container.querySelector('[data-summary="totalProfit"]'),
@@ -69,14 +74,33 @@
 
     var chart = null;
 
+    function applyPreset() {
+      if (!inputs.fundPreset) {
+        return;
+      }
+
+      var selectedOption = inputs.fundPreset.options[inputs.fundPreset.selectedIndex];
+      var presetAnnualRate = toNumber(selectedOption.getAttribute('data-annual-rate'), NaN);
+      var presetTrustFee = toNumber(selectedOption.getAttribute('data-trust-fee'), NaN);
+
+      if (Number.isFinite(presetAnnualRate) && Number.isFinite(presetTrustFee)) {
+        inputs.annualRate.value = presetAnnualRate.toFixed(1);
+        inputs.trustFee.value = presetTrustFee.toFixed(5);
+      }
+
+      runSimulation();
+    }
+
     function runSimulation() {
       var years = clamp(toNumber(inputs.years.value, 20), 1, 60);
       var annualRate = clamp(toNumber(inputs.annualRate.value, 5), 0, 30);
+      var trustFee = clamp(toNumber(inputs.trustFee.value, 0.1), 0, 5);
       var monthlyContribution = Math.max(0, toNumber(inputs.monthlyContribution.value, 30000));
       var initialAmount = Math.max(0, toNumber(inputs.initialAmount.value, 0));
 
-      var result = calculateSeries(years, annualRate, monthlyContribution, initialAmount);
+      var result = calculateSeries(years, annualRate, trustFee, monthlyContribution, initialAmount);
 
+      summary.netAnnualRate.textContent = result.effectiveAnnualRate.toFixed(2) + '%';
       summary.finalAsset.textContent = formatJPY(result.finalAsset, currencySymbol);
       summary.totalInvested.textContent = formatJPY(result.totalInvested, currencySymbol);
       summary.totalProfit.textContent = formatJPY(result.totalProfit, currencySymbol);
@@ -86,7 +110,7 @@
           type: 'area',
           height: 360,
           toolbar: { show: false },
-          fontFamily: 'Helvetica, sans-serif'
+          fontFamily: 'Hiragino Kaku Gothic ProN, Meiryo, sans-serif'
         },
         colors: ['#0f766e', '#f59e0b'],
         dataLabels: {
@@ -114,11 +138,11 @@
         },
         series: [
           {
-            name: labels.assetSeries || 'Asset',
+            name: labels.assetSeries || '資産残高',
             data: result.assetData
           },
           {
-            name: labels.investedSeries || 'Invested Principal',
+            name: labels.investedSeries || '投資元本',
             data: result.investedData
           }
         ],
@@ -146,6 +170,11 @@
     }
 
     button.addEventListener('click', runSimulation);
+
+    if (inputs.fundPreset) {
+      inputs.fundPreset.addEventListener('change', applyPreset);
+    }
+
     runSimulation();
   }
 
