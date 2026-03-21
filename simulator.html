@@ -1,0 +1,378 @@
+<!-- NISA積立複利シミュレーター
+     WordPressの「カスタムHTML」ブロックにそのままコピペして使用。
+     ApexChartsを動的ロードするため <script src> 不要。
+-->
+<style>
+.nisasim,
+.nisasim *,
+.nisasim *::before,
+.nisasim *::after { box-sizing: border-box; }
+
+.nisasim {
+  --p: #0f766e;
+  --a: #f59e0b;
+  --bd: #dbe5e3;
+  --mu: #55716c;
+  --sf: #ffffff;
+  font-family: 'Hiragino Kaku Gothic ProN', Meiryo, sans-serif;
+  font-size: 16px;
+  line-height: 1.6;
+  color: #17312d;
+  background: radial-gradient(circle at 90% 10%, #d0f2ec 0%, rgba(208,242,236,0) 40%),
+              linear-gradient(135deg, #ecf7f3 0%, #f7f9f6 100%);
+  border: 1px solid var(--bd);
+  border-radius: 20px;
+  padding: 1.75rem;
+  box-shadow: 0 12px 28px rgba(15,118,110,.08);
+}
+
+.nisasim__heading {
+  margin: 0 0 1.25rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--p);
+}
+
+/* 入力パネル */
+.nisasim__panel {
+  background: var(--sf);
+  border: 1px solid var(--bd);
+  border-radius: 16px;
+  padding: 1.25rem;
+}
+
+.nisasim__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+}
+
+.nisasim__field {
+  display: flex;
+  flex-direction: column;
+  gap: .3rem;
+}
+
+.nisasim__field label {
+  font-size: .85rem;
+  color: var(--mu);
+  font-weight: 500;
+}
+
+.nisasim__field input,
+.nisasim__field select {
+  border: 1px solid var(--bd);
+  border-radius: 10px;
+  padding: .6rem .75rem;
+  font-size: .97rem;
+  color: #17312d;
+  background: #fff;
+  width: 100%;
+  outline: none;
+  transition: border-color .15s;
+}
+
+.nisasim__field input:focus,
+.nisasim__field select:focus {
+  border-color: var(--p);
+  box-shadow: 0 0 0 2px rgba(15,118,110,.18);
+}
+
+.nisasim__btn {
+  margin-top: 1.1rem;
+  padding: .65rem 1.6rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #0f766e, #169b90);
+  color: #fff;
+  font-size: 1rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: filter .2s;
+}
+.nisasim__btn:hover { filter: brightness(1.08); }
+
+.nisasim__note {
+  margin-top: 1rem;
+  padding: .85rem 1rem;
+  background: #f7faf9;
+  border: 1px solid var(--bd);
+  border-radius: 12px;
+  font-size: .83rem;
+  color: var(--mu);
+  line-height: 1.65;
+}
+.nisasim__note p { margin: 0; }
+.nisasim__note p + p { margin-top: .4rem; }
+
+/* サマリーカード */
+.nisasim__summary {
+  margin-top: 1.1rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: .85rem;
+}
+
+.nisasim__card {
+  background: var(--sf);
+  border: 1px solid var(--bd);
+  border-radius: 14px;
+  padding: .85rem;
+}
+
+.nisasim__card-label {
+  display: block;
+  font-size: .78rem;
+  color: var(--mu);
+  margin-bottom: .25rem;
+  line-height: 1.35;
+}
+
+.nisasim__card-value {
+  display: block;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+/* チャート */
+.nisasim__chart {
+  margin-top: 1.1rem;
+  background: #fff;
+  border: 1px solid var(--bd);
+  border-radius: 16px;
+  padding: .25rem;
+  min-height: 380px;
+}
+
+/* ローディング表示 */
+.nisasim__loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 380px;
+  color: var(--mu);
+  font-size: .9rem;
+}
+
+/* レスポンシブ */
+@media (max-width: 640px) {
+  .nisasim { padding: 1rem; border-radius: 14px; }
+  .nisasim__grid { grid-template-columns: 1fr; }
+  .nisasim__summary { grid-template-columns: repeat(2, 1fr); }
+}
+</style>
+
+<div class="nisasim" id="nisasim-root">
+  <h2 class="nisasim__heading">NISA 積立シミュレーター</h2>
+
+  <div class="nisasim__panel">
+    <div class="nisasim__grid">
+
+      <div class="nisasim__field">
+        <label for="nisasim-preset">ファンド（選択で自動入力）</label>
+        <select id="nisasim-preset">
+          <option value="">カスタム（手動入力）</option>
+          <option value="sp500" data-r="7.0" data-f="0.09372">eMAXIS Slim 米国株式（S&amp;P500）</option>
+          <option value="orcan" data-r="6.0" data-f="0.05775">eMAXIS Slim 全世界株式（オール・カントリー）</option>
+        </select>
+      </div>
+
+      <div class="nisasim__field">
+        <label for="nisasim-years">運用年数（年）</label>
+        <input id="nisasim-years" type="number" min="1" max="60" step="1" value="20">
+      </div>
+
+      <div class="nisasim__field">
+        <label for="nisasim-rate">想定年利（%）</label>
+        <input id="nisasim-rate" type="number" min="0" max="30" step="0.1" value="5.0">
+      </div>
+
+      <div class="nisasim__field">
+        <label for="nisasim-fee">信託報酬（年率 %）</label>
+        <input id="nisasim-fee" type="number" min="0" max="5" step="0.001" value="0.100">
+      </div>
+
+      <div class="nisasim__field">
+        <label for="nisasim-monthly">毎月の積立額（円）</label>
+        <input id="nisasim-monthly" type="number" min="0" step="1000" value="30000">
+      </div>
+
+      <div class="nisasim__field">
+        <label for="nisasim-initial">現在の資産額（円）</label>
+        <input id="nisasim-initial" type="number" min="0" step="10000" value="0">
+      </div>
+
+    </div>
+
+    <button class="nisasim__btn" type="button" id="nisasim-run">シミュレーションする</button>
+
+    <div class="nisasim__note">
+      <p>参考: S&amp;P500の長期平均リターンは年率約7%、オルカンは約6%が目安とされます。</p>
+      <p>ファンドを選ぶと想定年利と信託報酬が自動入力されます。必要に応じて手動で調整してください。</p>
+      <p>注意: 本ツールは試算目的のシミュレーターです。将来の運用成績を保証するものではありません。</p>
+    </div>
+  </div>
+
+  <div class="nisasim__summary">
+    <div class="nisasim__card">
+      <span class="nisasim__card-label">実質年利<br>（年利 − 信託報酬）</span>
+      <span class="nisasim__card-value" id="nisasim-res-rate">—</span>
+    </div>
+    <div class="nisasim__card">
+      <span class="nisasim__card-label">最終資産</span>
+      <span class="nisasim__card-value" id="nisasim-res-asset">—</span>
+    </div>
+    <div class="nisasim__card">
+      <span class="nisasim__card-label">投資元本合計</span>
+      <span class="nisasim__card-value" id="nisasim-res-invested">—</span>
+    </div>
+    <div class="nisasim__card">
+      <span class="nisasim__card-label">運用益</span>
+      <span class="nisasim__card-value" id="nisasim-res-profit">—</span>
+    </div>
+  </div>
+
+  <div class="nisasim__chart" id="nisasim-chart">
+    <div class="nisasim__loading" id="nisasim-loading">グラフを読み込んでいます…</div>
+  </div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  /* ---- ユーティリティ ---- */
+  function toNum(v, fb) { var n = Number(v); return Number.isFinite(n) ? n : fb; }
+  function clamp(v, lo, hi) { return Math.min(hi, Math.max(lo, v)); }
+  function jpy(v) { return '\u00a5' + Math.round(v).toLocaleString('ja-JP'); }
+
+  /* ---- 計算 ---- */
+  function calc(years, rate, fee, monthly, initial) {
+    var eff = rate - fee;
+    var mr  = Math.pow(1 + eff / 100, 1 / 12) - 1;
+    var bal = initial, inv = initial;
+    var labels = ['\u958b\u59cb\u6642\u70b9']; // '開始時点'
+    var asset = [Math.round(bal)], invested = [Math.round(inv)];
+    for (var m = 1; m <= years * 12; m++) {
+      bal = bal * (1 + mr) + monthly;
+      inv += monthly;
+      if (m % 12 === 0) {
+        labels.push((m / 12) + '\u5e74\u76ee'); // '年目'
+        asset.push(Math.round(bal));
+        invested.push(Math.round(inv));
+      }
+    }
+    return { eff: eff, labels: labels, asset: asset, invested: invested,
+             finalAsset: bal, totalInvested: inv, profit: bal - inv };
+  }
+
+  /* ---- DOM 参照 ---- */
+  var root      = document.getElementById('nisasim-root');
+  var elPreset  = document.getElementById('nisasim-preset');
+  var elYears   = document.getElementById('nisasim-years');
+  var elRate    = document.getElementById('nisasim-rate');
+  var elFee     = document.getElementById('nisasim-fee');
+  var elMonthly = document.getElementById('nisasim-monthly');
+  var elInitial = document.getElementById('nisasim-initial');
+  var elBtn     = document.getElementById('nisasim-run');
+  var elResRate     = document.getElementById('nisasim-res-rate');
+  var elResAsset    = document.getElementById('nisasim-res-asset');
+  var elResInvested = document.getElementById('nisasim-res-invested');
+  var elResProfit   = document.getElementById('nisasim-res-profit');
+  var elChartWrap   = document.getElementById('nisasim-chart');
+  var elLoading     = document.getElementById('nisasim-loading');
+
+  /* いずれかの要素が取得できなければ即終了（ページに複数貼っても干渉しない） */
+  if (!root || !elBtn || !elChartWrap) { return; }
+
+  var chart = null;
+
+  /* ---- プリセット変更 ---- */
+  elPreset.addEventListener('change', function () {
+    var opt = elPreset.options[elPreset.selectedIndex];
+    var r = toNum(opt.getAttribute('data-r'), NaN);
+    var f = toNum(opt.getAttribute('data-f'), NaN);
+    if (Number.isFinite(r)) { if (Number.isFinite(f)) {
+      elRate.value = r.toFixed(1);
+      elFee.value  = f.toFixed(3);
+    } }
+    run();
+  });
+
+  /* ---- シミュレーション実行 ---- */
+  function run() {
+    var years   = clamp(toNum(elYears.value,   20),     1,  60);
+    var rate    = clamp(toNum(elRate.value,      5),     0,  30);
+    var fee     = clamp(toNum(elFee.value,      0.1),   0,   5);
+    var monthly = Math.max(0, toNum(elMonthly.value, 30000));
+    var initial = Math.max(0, toNum(elInitial.value,    0));
+
+    var d = calc(years, rate, fee, monthly, initial);
+
+    elResRate.textContent     = d.eff.toFixed(2) + '%';
+    elResAsset.textContent    = jpy(d.finalAsset);
+    elResInvested.textContent = jpy(d.totalInvested);
+    elResProfit.textContent   = jpy(d.profit);
+
+    if (elLoading) { elLoading.style.display = 'none'; }
+
+    var opts = {
+      chart: {
+        type: 'area',
+        height: 360,
+        toolbar: { show: false },
+        fontFamily: 'Hiragino Kaku Gothic ProN, Meiryo, sans-serif',
+        animations: { enabled: true, speed: 400 },
+      },
+      colors: ['#0f766e', '#f59e0b'],
+      dataLabels: { enabled: false },
+      stroke: { curve: 'smooth', width: 2.5 },
+      fill: {
+        type: 'gradient',
+        gradient: { shadeIntensity: 0.2, opacityFrom: 0.42, opacityTo: 0.06, stops: [0, 90, 100] },
+      },
+      series: [
+        { name: '\u8cc7\u7523\u6b8b\u9ad8', data: d.asset },    // 資産残高
+        { name: '\u6295\u8cc7\u5143\u672c', data: d.invested },  // 投資元本
+      ],
+      xaxis: {
+        categories: d.labels,
+        tickAmount: Math.min(d.labels.length - 1, 10),
+      },
+      yaxis: { labels: { formatter: jpy } },
+      tooltip: { y: { formatter: jpy } },
+      legend: { position: 'top' },
+      grid: { borderColor: '#e8f0ee' },
+    };
+
+    if (chart) {
+      chart.updateOptions(opts, true, true);
+    } else {
+      chart = new ApexCharts(elChartWrap, opts);
+      chart.render();
+    }
+  }
+
+  elBtn.addEventListener('click', run);
+
+  /* ---- 入力値変更でリアルタイム更新 ---- */
+  [elYears, elRate, elFee, elMonthly, elInitial].forEach(function (el) {
+    el.addEventListener('input', run);
+  });
+
+  /* ---- ApexCharts を動的ロードしてから初回実行 ---- */
+  function loadApex(cb) {
+    if (typeof ApexCharts !== 'undefined') { cb(); return; }
+    var s = document.createElement('script');
+    s.src = 'https://cdn.jsdelivr.net/npm/apexcharts@3.54.1/dist/apexcharts.min.js';
+    s.onload  = cb;
+    s.onerror = function () {
+      if (elLoading) { elLoading.textContent = 'グラフの読み込みに失敗しました。ページを再読み込みしてください。'; }
+    };
+    document.head.appendChild(s);
+  }
+
+  loadApex(run);
+
+})();
+</script>
